@@ -12,7 +12,7 @@ data = pd.read_csv(file_path)
 
 # Drop SOIL_LANDSCAPE_ID and text columns
 text_columns = [col for col in data.columns if '_CLASS_EN' in col or '_CLASS_FR' in col]
-data = data.drop(columns=['SOIL_LANDSCAPE_ID'] + text_columns)
+data = data.drop( text_columns)
 
 # Convert wide format to long format
 value_columns = [col for col in data.columns if '_VAL' in col]
