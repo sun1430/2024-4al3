@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -10,9 +11,18 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
+merged_eri_path = "data/merged_ERI.csv"
+dataprocess_script = "dataprocess.py"
+
+# Check if merged_ERI exists, if not, run dataprocess.py
+if not os.path.exists(merged_eri_path):
+    print(f"{merged_eri_path} not found. Running {dataprocess_script} to generate it.")
+    subprocess.run([sys.executable, dataprocess_script])
+
+
 # Load data
-data_path = "data/merged_ERI.csv"
-data = pd.read_csv(data_path)
+data = pd.read_csv(merged_eri_path)
+
 
 #This function is used to create time-series sequences, so that RNN is meaningful
 def create_sequences(data, group_col, feature_cols, target_cols, years, target_year):
