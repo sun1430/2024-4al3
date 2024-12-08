@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader, Dataset
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -41,6 +43,7 @@ target_columns = ['Erosion_Value1N', 'Erosion_Value2N', 'Erosion_Value3N', 'Eros
 
 #make training and testing to sequences
 train_sequences, train_targets = create_sequences(data, "SOIL_LANDSCAPE_ID", feature_columns, target_columns, training_years, target_year)
+test_sequences, test_targets = create_sequences(data, "SOIL_LANDSCAPE_ID", feature_columns, target_columns, training_years, target_year)
 
 #make it PyTorch Dataset
 class ErosionDataset(Dataset):
@@ -122,7 +125,6 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(range(len(train_dataset))))
     print(f"Fold {fold + 1}, Validation Loss: {val_loss:.4f}")
 
 #Test
-test_sequences, test_targets = create_sequences(data, "SOIL_LANDSCAPE_ID", feature_columns, target_columns, training_years, target_year)
 test_dataset = ErosionDataset(test_sequences, test_targets)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -139,7 +141,27 @@ with torch.no_grad():
 test_loss /= len(test_loader)
 print(f"Test Loss: {test_loss:.4f}")
 
-#Make a DataFrame for review
+# De-normalize predictions
+scalers = {}
+for col in feature_columns:
+    scalers[col] = MinMaxScaler()
+    scalers[col].fit(data[data['Year'] <= 2016][[col]])
+
+def denormalize(predictions, scalers, columns):
+    de_normalized = []
+    for i, col in enumerate(columns):
+        de_normalized.append(scalers[col].inverse_transform(predictions[:, i].reshape(-1, 1)))
+    return np.hstack(de_normalized)
+
 predictions = np.array(predictions).squeeze()
+de_normalized_predictions = denormalize(predictions, scalers, feature_columns)
+
+test_targets = np.array(test_targets)
+mae = mean_absolute_error(test_targets, de_normalized_predictions)
+rmse = np.sqrt(mean_squared_error(test_targets, de_normalized_predictions))
+print(f"De-Normalized MAE: {mae:.4f}")
+print(f"De-Normalized RMSE: {rmse:.4f}")
+
+#Make a DataFrame for review
 predicted_df = pd.DataFrame(predictions, columns=target_columns)
 predicted_df.to_csv("data/predicted_ERI_2021.csv", index=False)
