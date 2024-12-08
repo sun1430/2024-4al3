@@ -13,9 +13,6 @@ dataprocess_script = "dataprocess.py"
 model_script = "model.py"
 results_folder = "results"
 
-# Define the path to the results folder
-results_folder = "results"
-
 # Check if the results folder exists, if not, create it
 if not os.path.exists(results_folder):
     print(f"{results_folder} not found. Creating it.")
