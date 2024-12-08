@@ -1,8 +1,17 @@
 import os
+import subprocess
+import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, confusion_matrix, ConfusionMatrixDisplay 
+
+# Define paths to the data files and scripts
+merged_eri_path = "data/merged_ERI.csv"
+predicted_eri_2021_path = "data/predicted_ERI_2021.csv"
+dataprocess_script = "dataprocess.py"
+model_script = "model.py"
+results_folder = "results"
 
 # Define the path to the results folder
 results_folder = "results"
@@ -11,6 +20,16 @@ results_folder = "results"
 if not os.path.exists(results_folder):
     print(f"{results_folder} not found. Creating it.")
     os.makedirs(results_folder)
+
+# Check if merged_ERI exists, if not, run dataprocess.py
+if not os.path.exists(merged_eri_path):
+    print(f"{merged_eri_path} not found. Running {dataprocess_script} to generate it.")
+    subprocess.run([sys.executable, dataprocess_script])
+
+# Check if predicted_ERI_2021 exists, if not, run model.py
+if not os.path.exists(predicted_eri_2021_path):
+    print(f"{predicted_eri_2021_path} not found. Running {model_script} to generate it.")
+    subprocess.run([sys.executable, model_script])
 
 # Load actual and predicted data
 actual_data_path = "data/merged_ERI.csv"
