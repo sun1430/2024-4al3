@@ -1,4 +1,5 @@
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 from functools import reduce
 
 # Load data
@@ -8,13 +9,14 @@ file_path3 = "data/ENV_AEI_SOIL_ERI_WATER.csv"
 file_path4 = "data/ENV_AEI_SOIL_ERI_TILLAGE.csv"
 output_file_path = "data/merged_ERI.csv"
 
+
 with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
     data = pd.read_csv(f)
 with open(file_path2, 'r', encoding='utf-8', errors='replace') as f2:
     data2 = pd.read_csv(f2)
 with open(file_path3, 'r', encoding='utf-8', errors='replace') as f3:
     data3 = pd.read_csv(f3)
-with open(file_path4, 'r', encoding='utf-8', errors='replace') as f4:
+with open(file_path4, 'r',encoding='utf-8', errors='replace') as f4:
     data4 = pd.read_csv(f4)
 
 def process_data(data, n):
@@ -24,7 +26,7 @@ def process_data(data, n):
     value_columns = [col for col in data.columns if '_VAL' in col and '_CHG' not in col]
     class_columns = [col for col in data.columns if '_CLASS' in col and '_CHG' not in col]
     
-    # melt
+    #melt
     values_long = pd.melt(data, id_vars=['SOIL_LANDSCAPE_ID'], value_vars=value_columns,
                           var_name="Year", value_name=f"Erosion_Value{n}")
     class_long = pd.melt(data, id_vars=['SOIL_LANDSCAPE_ID'], value_vars=class_columns,
@@ -44,22 +46,39 @@ combined_data4 = process_data(data4, 4)
 all_data = [combined_data1, combined_data2, combined_data3, combined_data4]
 final_data = reduce(lambda left, right: pd.merge(left, right, on=['SOIL_LANDSCAPE_ID', 'Year'], how='inner'), all_data)
 
+def interpolate_missing_values(data, group_col, value_cols):
+    data = data.copy()
+    for col in value_cols:
+        # Replace zeros with NaN for meaningful interpolation
+        data[col] = data[col].replace(0, pd.NA)
+        # Group by ID and interpolate missing values
+        data[col] = (
+            data.groupby(group_col)[col]
+            .apply(lambda x: x.interpolate(method='linear').bfill().ffill())
+            .reset_index(level=0, drop=True)
+        )
+        # Ensure all missing values are handled
+    data[value_cols] = data[value_cols].fillna(0)
+    return data
+
 # Handle missing values
 value_columns = ['Erosion_Value1', 'Erosion_Value2', 'Erosion_Value3', 'Erosion_Value4']
 class_columns = ['Erosion_Class1', 'Erosion_Class2', 'Erosion_Class3', 'Erosion_Class4']
 
-for col in value_columns:
-    final_data[col] = final_data[col].interpolate().fillna(0)
+final_data = interpolate_missing_values(final_data, 'SOIL_LANDSCAPE_ID', value_columns)
 
 for col in class_columns:
     final_data[col] = final_data[col].ffill().fillna(0)
 
-# Add original values to Erosion_ValueXN columns
-for i, col in enumerate(value_columns, 1):
-    final_data[f'Erosion_Value{i}N'] = final_data[col]
+'''
+# Normalize Erosion_Value
+scaler = MinMaxScaler()
+for col in value_columns:
+    final_data[col] = final_data[col].astype(float).fillna(0)
+    final_data[f'{col}N'] = scaler.fit_transform(final_data[[col]])
+'''
 
-# Output the final data
-output = final_data.drop(columns=value_columns)
+output = final_data.drop(columns = value_columns)
 
 # Split data into training (1981-2016) and testing (2021)
 X = output[output['Year'] <= 2016]
@@ -73,6 +92,4 @@ print(output.isnull().sum())
 
 print("Rows with all missing values:")
 print(output.isnull().all(axis=1).sum())
-
-# Save the final output to CSV
 output.to_csv(output_file_path, index=False)
