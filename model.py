@@ -43,9 +43,7 @@ target_columns = ['Erosion_Value1N', 'Erosion_Value2N', 'Erosion_Value3N', 'Eros
 
 #make training and testing to sequences
 train_sequences, train_targets = create_sequences(data, "SOIL_LANDSCAPE_ID", feature_columns, target_columns, training_years, target_year)
-
 test_sequences, test_targets = create_sequences(data, "SOIL_LANDSCAPE_ID", feature_columns, target_columns, training_years, target_year)
-
 
 #make it PyTorch Dataset
 class ErosionDataset(Dataset):
@@ -127,7 +125,6 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(range(len(train_dataset))))
     print(f"Fold {fold + 1}, Validation Loss: {val_loss:.4f}")
 
 #Test
-test_sequences, test_targets = create_sequences(data, "SOIL_LANDSCAPE_ID", feature_columns, target_columns, training_years, target_year)
 test_dataset = ErosionDataset(test_sequences, test_targets)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -166,8 +163,5 @@ print(f"De-Normalized MAE: {mae:.4f}")
 print(f"De-Normalized RMSE: {rmse:.4f}")
 
 #Make a DataFrame for review
-=======
-#Make a DataFrame for review
-predictions = np.array(predictions).squeeze()
 predicted_df = pd.DataFrame(predictions, columns=target_columns)
 predicted_df.to_csv("data/predicted_ERI_2021.csv", index=False)
