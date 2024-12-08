@@ -46,27 +46,38 @@ combined_data4 = process_data(data4, 4)
 all_data = [combined_data1, combined_data2, combined_data3, combined_data4]
 final_data = reduce(lambda left, right: pd.merge(left, right, on=['SOIL_LANDSCAPE_ID', 'Year'], how='inner'), all_data)
 
-
+def interpolate_missing_values(data, group_col, value_cols):
+    data = data.copy()
+    for col in value_cols:
+        # Replace zeros with NaN for meaningful interpolation
+        data[col] = data[col].replace(0, pd.NA)
+        # Group by ID and interpolate missing values
+        data[col] = (
+            data.groupby(group_col)[col]
+            .apply(lambda x: x.interpolate(method='linear').bfill().ffill())
+            .reset_index(level=0, drop=True)
+        )
+        # Ensure all missing values are handled
+    data[value_cols] = data[value_cols].fillna(0)
+    return data
 
 # Handle missing values
 value_columns = ['Erosion_Value1', 'Erosion_Value2', 'Erosion_Value3', 'Erosion_Value4']
 class_columns = ['Erosion_Class1', 'Erosion_Class2', 'Erosion_Class3', 'Erosion_Class4']
 
-for col in value_columns:
-    final_data[col] = final_data[col].interpolate().fillna(0)
+final_data = interpolate_missing_values(final_data, 'SOIL_LANDSCAPE_ID', value_columns)
 
 for col in class_columns:
     final_data[col] = final_data[col].ffill().fillna(0)
 
-
-# Normalize numerical features (Erosion_Value)
-
+# Normalize Erosion_Value
 scaler = MinMaxScaler()
 for col in value_columns:
+    final_data[col] = final_data[col].astype(float).fillna(0)
     final_data[f'{col}N'] = scaler.fit_transform(final_data[[col]])
 
-
 output = final_data.drop(columns = value_columns)
+
 # Split data into training (1981-2016) and testing (2021)
 X = output[output['Year'] <= 2016]
 Y = output[output['Year'] == 2021]
