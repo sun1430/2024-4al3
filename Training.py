@@ -76,8 +76,14 @@ class_columns = ['Erosion_Class1', 'Erosion_Class2', 'Erosion_Class3', 'Erosion_
 
 final_data = interpolate_missing_values(final_data, 'SOIL_LANDSCAPE_ID', value_columns)
 
-for col in class_columns:
-    final_data[col] = final_data[col].ffill().fillna(0)
+bins = [0, 6, 11, 22, 33, float('inf')]
+labels = [1, 2, 3, 4, 5]
+
+for value_col, class_col in zip(value_columns, class_columns):
+    final_data[class_col] = pd.cut(final_data[value_col], bins=bins, labels=labels, right=False).astype('Int64')
+    final_data.loc[final_data[value_col] == 0, class_col] = 0
+
+    final_data[class_col] = final_data[class_col].astype(int)
 
 '''
 # Normalize Erosion_Value
