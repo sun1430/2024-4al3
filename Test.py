@@ -125,3 +125,126 @@ ground_truth = np.vstack(ground_truth)
 
 #Optionally save predictions for analysis
 np.save("predictions.npy", predictions)
+
+
+if not os.path.exists("results"):
+    os.makedirs("results")
+
+# Load test features and predictions
+test_features = np.load("data/test_features.npy")
+predictions = np.load("predictions.npy")
+
+print(f"Loaded Test Features Shape: {test_features.shape}")
+print(f"Loaded Predictions Shape: {predictions.shape}")
+
+# Filter test features for 2021 data
+target_year = 2021
+target_columns = [2, 3, 4, 5]
+
+# Extract features for 2021
+test_2021 = test_features[test_features[:, 1] == target_year]
+print(f"Test Data for 2021: {test_2021.shape}")
+
+# Actual targets from test_features (assuming erosion values are in certain columns)
+actual_targets = test_2021[:, target_columns]
+print(f"Actual Targets for 2021: {actual_targets.shape}")
+
+# Ensure predictions and actual values are aligned
+assert predictions.shape[0] == actual_targets.shape[0], "Mismatch between predictions and actual targets"
+
+
+# Calculate MSE, MAE, R2 for each target
+results = {}
+for i, target_column in enumerate(target_columns):
+    actual = actual_targets[:, i]
+    predicted = predictions[:, i]
+
+    mse = mean_squared_error(actual, predicted)
+    rmse = np.sqrt(mse)
+    mae = mean_absolute_error(actual, predicted)
+    r2 = r2_score(actual, predicted)
+
+    results[f"Target {i+1}"] = {
+        "MSE": mse,
+        "RMSE": rmse,
+        "MAE": mae,
+        "R2 Score": r2
+    }
+
+# Display regression results
+results_df = pd.DataFrame(results).T
+print("Regression Results:")
+print(results_df)
+
+
+# Visualization of predictions vs. actual
+plt.figure(figsize=(14, 10))
+for i in range(len(target_columns)):
+    actual = actual_targets[:, i]
+    predicted = predictions[:, i]
+    plt.subplot(2, 2, i+1)
+    plt.scatter(range(len(actual)), actual, label='Actual', color='b')
+    plt.scatter(range(len(predicted)), predicted, label='Predicted', color='r')
+    plt.title(f"Actual vs Predicted for Target {i+1}")
+    plt.xlabel("Sample Index")
+    plt.ylabel("Erosion Value")
+    plt.legend()
+    plt.tight_layout()
+plt.savefig("results/actual_vs_predicted.png")
+plt.show()
+
+
+# Map continuous values to categories
+def map_to_category(value):
+    if value < 6:
+        return "Very Low"
+    elif 6 <= value <= 11:
+        return "Low"
+    elif 11 < value <= 22:
+        return "Moderate"
+    elif 22 < value <= 33:
+        return "High"
+    else:
+        return "Very High"
+
+# Convert actual and predicted values to categories
+classification_results = []
+for i, target_column in enumerate(target_columns):
+    actual_2021_category = [map_to_category(value) for value in actual_targets[:, i]]
+    predicted_category = [map_to_category(value) for value in predictions[:, i]]
+
+    # Compute confusion matrix
+    cm = confusion_matrix(actual_2021_category, predicted_category, labels=["Very Low", "Low", "Moderate", "High", "Very High"])
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Very Low", "Low", "Moderate", "High", "Very High"])
+    disp.plot(cmap=plt.cm.Blues, values_format='d')
+    plt.title(f"Confusion Matrix for Target {i+1}")
+    plt.tight_layout()
+    plt.savefig(f"results/confusion_matrix_target_{i+1}.png")
+    plt.show()
+
+    # Compute Precision, Recall, F1 Score, and Accuracy
+    precision, recall, f1, _ = precision_recall_fscore_support(actual_2021_category, predicted_category, average='weighted')
+    accuracy = accuracy_score(actual_2021_category, predicted_category)
+
+    # Store results
+    classification_results.append({
+        "Target": f"Target {i+1}",
+        "Precision": precision,
+        "Recall": recall,
+        "F1 Score": f1,
+        "Accuracy": accuracy
+    })
+
+# Convert classification results to DataFrame
+classification_df = pd.DataFrame(classification_results).set_index("Target")
+
+# Merge regression and classification results
+final_results_df = pd.concat([results_df, classification_df], axis=1)
+
+# Display and save final results
+print("Final Evaluation Results:")
+print(final_results_df)
+
+# Save final evaluation results to CSV
+final_results_df.to_csv("results/evaluation_results.csv", index=True)
+print("Final evaluation results saved to results/evaluation_results.csv")
