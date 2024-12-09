@@ -127,6 +127,7 @@ ground_truth = np.vstack(ground_truth)
 np.save("predictions.npy", predictions)
 
 
+# ------------------------------ Evaluation ------------------------------
 if not os.path.exists("results"):
     os.makedirs("results")
 
@@ -173,9 +174,6 @@ for i, target_column in enumerate(target_columns):
 
 # Display regression results
 results_df = pd.DataFrame(results).T
-print("Regression Results:")
-print(results_df)
-
 
 # Visualization of predictions vs. actual
 plt.figure(figsize=(14, 10))
