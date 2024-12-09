@@ -4,7 +4,7 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import (mean_squared_error, mean_absolute_error, r2_score, 
+from sklearn.metrics import (mean_squared_error, mean_absolute_error, r2_score, accuracy_score,
                              confusion_matrix, ConfusionMatrixDisplay, precision_recall_fscore_support)
 
 # Define paths to the data files and scripts
@@ -97,7 +97,7 @@ def map_to_category(value):
     else:
         return "Very High"
 
-# Map actual and predicted values to categories
+
 classification_results = []
 for col in target_columns:
     actual_2021[f"{col}_Category"] = actual_2021[col].apply(map_to_category)
@@ -115,13 +115,17 @@ for col in target_columns:
     plt.savefig(f"results/confusion_matrix_{col}.png")
     plt.show()
     
-    # Compute Precision, Recall, F1 Score
+    # Compute Precision, Recall, F1 Score, and Accuracy
     precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='weighted')
+    accuracy = accuracy_score(y_true, y_pred)  # Calculate accuracy
+    
+    # Add results to classification_results
     classification_results.append({
         "Target": col,
         "Precision": precision,
         "Recall": recall,
-        "F1 Score": f1
+        "F1 Score": f1,
+        "Accuracy": accuracy  # Add accuracy to the results
     })
 
 # Convert classification results to DataFrame
