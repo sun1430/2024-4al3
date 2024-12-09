@@ -4,7 +4,8 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, confusion_matrix, ConfusionMatrixDisplay 
+from sklearn.metrics import (mean_squared_error, mean_absolute_error, r2_score, 
+                             confusion_matrix, ConfusionMatrixDisplay, precision_recall_fscore_support)
 
 # Define paths to the data files and scripts
 merged_eri_path = "data/merged_ERI.csv"
@@ -67,10 +68,6 @@ results_df = pd.DataFrame(results).T
 print("Evaluation Results:")
 print(results_df)
 
-# Save evaluation results to a CSV file
-evaluation_results_path = "results/evaluation_results.csv"
-results_df.to_csv(evaluation_results_path, index=True)
-print(f"Evaluation results saved to {evaluation_results_path}")
 
 # Visualization of predictions vs. actual
 plt.figure(figsize=(14, 10))
@@ -87,22 +84,7 @@ plt.savefig("results/actual_vs_predicted.png")
 plt.show()
 
 
-# Residual analysis
-plt.figure(figsize=(14, 10))
-for i, col in enumerate(target_columns, 1):
-    residuals = actual_2021[col] - predicted_data[col]
-    plt.subplot(2, 2, i)
-    plt.scatter(range(len(residuals)), residuals)
-    plt.axhline(0, color='red', linestyle='--')
-    plt.title(f"Residuals for {col}")
-    plt.xlabel("Sample Index")
-    plt.ylabel("Residual (Actual - Predicted)")
-    plt.tight_layout()
-plt.savefig("results/residuals_analysis.png")
-plt.show()
-
-
-# Function to map continuous values to categories
+# Map continuous values to categories
 def map_to_category(value):
     if value < 6:
         return "Very Low"
@@ -116,14 +98,15 @@ def map_to_category(value):
         return "Very High"
 
 # Map actual and predicted values to categories
+classification_results = []
 for col in target_columns:
     actual_2021[f"{col}_Category"] = actual_2021[col].apply(map_to_category)
     predicted_data[f"{col}_Category"] = predicted_data[col].apply(map_to_category)
 
-# Confusion matrices
-for col in target_columns:
     y_true = actual_2021[f"{col}_Category"]
     y_pred = predicted_data[f"{col}_Category"]
+    
+    # Compute confusion matrix
     cm = confusion_matrix(y_true, y_pred, labels=["Very Low", "Low", "Moderate", "High", "Very High"])
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Very Low", "Low", "Moderate", "High", "Very High"])
     disp.plot(cmap=plt.cm.Blues, values_format='d')
@@ -131,3 +114,26 @@ for col in target_columns:
     plt.tight_layout()
     plt.savefig(f"results/confusion_matrix_{col}.png")
     plt.show()
+    
+    # Compute Precision, Recall, F1 Score
+    precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='weighted')
+    classification_results.append({
+        "Target": col,
+        "Precision": precision,
+        "Recall": recall,
+        "F1 Score": f1
+    })
+
+# Convert classification results to DataFrame
+classification_df = pd.DataFrame(classification_results).set_index("Target")
+
+# Merge classification metrics with regression metrics
+final_results_df = pd.concat([results_df, classification_df], axis=1)
+
+# Display and save final results
+print("Final Evaluation Results:")
+print(final_results_df)
+
+evaluation_results_path = "results/evaluation_results.csv"
+final_results_df.to_csv(evaluation_results_path, index=True)
+print(f"Final evaluation results saved to {evaluation_results_path}")
