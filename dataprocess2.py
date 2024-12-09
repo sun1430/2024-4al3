@@ -70,6 +70,10 @@ final_data = interpolate_missing_values(final_data, 'SOIL_LANDSCAPE_ID', value_c
 for col in class_columns:
     final_data[col] = final_data[col].ffill().fillna(0)
 
+# Add original values to Erosion_ValueXN columns
+for i, col in enumerate(value_columns, 1):
+    final_data[f'Erosion_Value{i}N'] = final_data[col]
+
 '''
 # Normalize Erosion_Value
 scaler = MinMaxScaler()
