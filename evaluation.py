@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -83,16 +84,30 @@ for i, col in enumerate(target_columns, 1):
 plt.savefig("results/actual_vs_predicted.png")
 plt.show()
 
+# Load scaler parameters
+with open('data/scaler_params.json', 'r') as f:
+    scaler_params = json.load(f)
 
-# Map continuous values to categories
-def map_to_category(value):
-    if value < 6:
+# Define category boundaries
+category_boundaries = [6, 11, 22, 33]
+
+# Scale boundaries for each column using loaded parameters
+category_boundaries_scaled = {}
+for col, params in scaler_params.items():
+    # Calculate scaled boundaries
+    min_val, max_val = params['min'], params['max']
+    scaled_boundaries = [(b - min_val) / (max_val - min_val) for b in category_boundaries]
+    category_boundaries_scaled[col] = scaled_boundaries
+
+# Map normalized values to categories
+def map_to_category(value, boundaries):
+    if value < boundaries[0]:
         return "Very Low"
-    elif 6 <= value <= 11:
+    elif boundaries[0] <= value <= boundaries[1]:
         return "Low"
-    elif 11 < value <= 22:
+    elif boundaries[1] < value <= boundaries[2]:
         return "Moderate"
-    elif 22 < value <= 33:
+    elif boundaries[2] < value <= boundaries[3]:
         return "High"
     else:
         return "Very High"
@@ -100,8 +115,9 @@ def map_to_category(value):
 
 classification_results = []
 for col in target_columns:
-    actual_2021[f"{col}_Category"] = actual_2021[col].apply(map_to_category)
-    predicted_data[f"{col}_Category"] = predicted_data[col].apply(map_to_category)
+    boundaries = category_boundaries_scaled[col]
+    actual_2021[f"{col}_Category"] = actual_2021[col].apply(lambda x: map_to_category(x, boundaries))
+    predicted_data[f"{col}_Category"] = predicted_data[col].apply(lambda x: map_to_category(x, boundaries))
 
     y_true = actual_2021[f"{col}_Category"]
     y_pred = predicted_data[f"{col}_Category"]

@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import json
 import pandas as pd
 import numpy as np
 import torch
@@ -79,19 +80,35 @@ if not os.path.exists(output_file_path):
 
     final_data = interpolate_missing_values(final_data, 'SOIL_LANDSCAPE_ID', value_columns)
 
-    for col in class_columns:
-        final_data[col] = final_data[col].ffill().fillna(0)
+    bins = [0, 6, 11, 22, 33, float('inf')]
+    labels = [1, 2, 3, 4, 5]
 
-    for i, col in enumerate(value_columns, 1):
-        final_data[f'Erosion_Value{i}N'] = final_data[col]
+    for value_col, class_col in zip(value_columns, class_columns):
+        final_data[class_col] = pd.cut(final_data[value_col], bins=bins, labels=labels, right=False).astype('Int64')
+        final_data.loc[final_data[value_col] == 0, class_col] = 0
 
-    '''
-    # Normalize Erosion_Value
-    scaler = MinMaxScaler()
+        final_data[class_col] = final_data[class_col].astype(int)
+
+
     for col in value_columns:
-        final_data[col] = final_data[col].astype(float).fillna(0)
+        final_data[f'{col}N'] = final_data[col]
+
+    scalers = {}
+
+    # Normalize Erosion_Value
+    scaler_params = {}
+    for col in value_columns:
+        scaler = MinMaxScaler()
+
         final_data[f'{col}N'] = scaler.fit_transform(final_data[[col]])
-    '''
+        scaler_params[f'{col}N'] = {'min': scaler.data_min_[0], 'max': scaler.data_max_[0]}
+    
+    # Save the scaler parameters to a JSON file
+    with open('data/scaler_params.json', 'w') as f:
+        json.dump(scaler_params, f)
+
+    print("Scaler parameters saved to scaler_params.json")
+
 
     #Output preprocessed data
     output = final_data.drop(columns = value_columns)
@@ -241,6 +258,7 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(range(len(train_dataset))
             optimizer.step()
             train_loss += loss.item()
         train_loss /= len(train_loader)
+        
         print(f"Epoch {epoch + 1}, Train Loss: {train_loss:.4f}")
 
     #validate
