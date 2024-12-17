@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import json
 import pandas as pd
 import numpy as np
 import torch
@@ -8,7 +9,7 @@ import torch.nn as nn
 from sklearn.model_selection import KFold
 from sklearn.model_selection import TimeSeriesSplit
 from torch.utils.data import DataLoader, Dataset
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from functools import reduce
 
@@ -77,6 +78,7 @@ class_columns = ['Erosion_Class1', 'Erosion_Class2', 'Erosion_Class3', 'Erosion_
 final_data = interpolate_missing_values(final_data, 'SOIL_LANDSCAPE_ID', value_columns)
 
 bins = [0, 6, 11, 22, 33, float('inf')]
+bins2 = [0, 6, 11, 22, 33]
 labels = [1, 2, 3, 4, 5]
 
 for value_col, class_col in zip(value_columns, class_columns):
@@ -85,20 +87,27 @@ for value_col, class_col in zip(value_columns, class_columns):
 
     final_data[class_col] = final_data[class_col].astype(int)
 
-'''
 # Normalize Erosion_Value
-scaler = MinMaxScaler()
+value_columnsN = ['Erosion_Value1N', 'Erosion_Value2N', 'Erosion_Value3N', 'Erosion_Value4N']
+scaler_params = {}
 for col in value_columns:
-    final_data[col] = final_data[col].astype(float).fillna(0)
+    scaler = StandardScaler()
+
     final_data[f'{col}N'] = scaler.fit_transform(final_data[[col]])
-'''
+    scaler_params[f'{col}N'] = {'mean': scaler.mean_[0], 'std': scaler.scale_[0]}
+    
+# Save the scaler parameters to a JSON file
+with open('data/scaler_params.json', 'w') as f:
+    json.dump(scaler_params, f)
+
+    print("Scaler parameters saved to scaler_params.json")
 
 train_data = final_data[final_data['Year'] <= 2016]
 test_data = final_data[final_data['Year'] >= 2006]
 
 #Extract features and save as .npy
-train_features = train_data[['SOIL_LANDSCAPE_ID', 'Year'] + value_columns].values
-test_features = test_data[['SOIL_LANDSCAPE_ID', 'Year'] + value_columns].values
+train_features = train_data[['SOIL_LANDSCAPE_ID', 'Year'] + value_columnsN].values
+test_features = test_data[['SOIL_LANDSCAPE_ID', 'Year'] + value_columnsN].values
 
 np.save("data/train_features.npy", train_features)
 np.save("data/test_features.npy", test_features)
@@ -107,7 +116,7 @@ np.save("data/test_features.npy", test_features)
 final_data = final_data.drop(columns = value_columns)
 
 #Save final processed data as CSV
-final_data.to_csv("data/processed_data.csv", index=False)
+#final_data.to_csv("data/processed_data.csv", index=False)
 
 print("Data preprocess complete -------")
 

@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import json
 import torch
 import pandas as pd
 import numpy as np
@@ -98,6 +99,7 @@ class TestDataset(Dataset):
 
 #Create the dataset and dataloader
 test_dataset = TestDataset(test_sequences, test_targets)
+print(len(test_dataset))
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 criterion = nn.MSELoss()
@@ -116,6 +118,7 @@ with torch.no_grad():
         loss = criterion(outputs, batch_targets)
         test_loss += loss.item()
 
+print(len(test_loader))
 test_loss /= len(test_loader)
 print(f"Test Loss (MSE): {test_loss:.4f}")
 
@@ -191,25 +194,40 @@ for i in range(len(target_columns)):
 plt.savefig("results/actual_vs_predicted.png")
 plt.show()
 
+# Load scaler parameters
+with open('data/scaler_params.json', 'r') as f:
+    scaler_params = json.load(f)
 
-# Map continuous values to categories
-def map_to_category(value):
-    if value < 6:
+# Define category boundaries
+category_boundaries = [6, 11, 22, 33]
+
+# Scale boundaries for each column using loaded parameters
+category_boundaries_scaled = {}
+for col, params in scaler_params.items():
+    # Calculate scaled boundaries
+    mean, std = params['mean'], params['std']
+    scaled_boundaries = [(b - mean) / std for b in category_boundaries]
+    category_boundaries_scaled[col] = scaled_boundaries
+
+# Map normalized values to categories
+def map_to_category(value, boundaries):
+    if value < boundaries[0]:
         return "Very Low"
-    elif 6 <= value <= 11:
+    elif boundaries[0] <= value <= boundaries[1]:
         return "Low"
-    elif 11 < value <= 22:
+    elif boundaries[1] < value <= boundaries[2]:
         return "Moderate"
-    elif 22 < value <= 33:
+    elif boundaries[2] < value <= boundaries[3]:
         return "High"
     else:
         return "Very High"
 
+
 # Convert actual and predicted values to categories
 classification_results = []
 for i, target_column in enumerate(target_columns):
-    actual_2021_category = [map_to_category(value) for value in actual_targets[:, i]]
-    predicted_category = [map_to_category(value) for value in predictions[:, i]]
+    actual_2021_category = [map_to_category(value,category_boundaries_scaled[f'Erosion_Value{i+1}N']) for value in actual_targets[:, i]]
+    predicted_category = [map_to_category(value,category_boundaries_scaled[f'Erosion_Value{i+1}N']) for value in predictions[:, i]]
 
     # Compute confusion matrix
     cm = confusion_matrix(actual_2021_category, predicted_category, labels=["Very Low", "Low", "Moderate", "High", "Very High"])
