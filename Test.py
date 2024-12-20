@@ -25,7 +25,7 @@ class SimpleRNN(nn.Module):
 
     def forward(self, x):
         out, _ = self.rnn(x)
-        out = self.fc(out[:, -1, :])  # Use the last output of the RNN
+        out = self.fc(out[:, -1, :])
         return out
 
 class SimpleLSTM(nn.Module):
@@ -38,8 +38,8 @@ class SimpleLSTM(nn.Module):
     def forward(self, x):
         out, (hn, cn) = self.lstm(x)
         out = self.dropout(out[:, -1, :])
-        #out = self.fc(out)
-        out = F.leaky_relu(self.fc(out))
+        out = self.fc(out)
+        #out = F.relu(self.fc(out))
         return out
     
 def load_model_from_pickle(file_path, model_class, device):

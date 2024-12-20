@@ -195,19 +195,18 @@ class SimpleLSTM(nn.Module):
     def forward(self, x):
         out, (hn, cn) = self.lstm(x)
         out = self.dropout(out[:, -1, :])
-        #out = self.fc(out)
-        out = F.leaky_relu(self.fc(out))
+        out = self.fc(out)
+        #out = F.relu(self.fc(out))
         return out
 
 class EarlyStopping:
-    def __init__(self, patience=5, delta=0):
+    def __init__(self, patience):
         self.patience = patience
-        self.delta = delta
         self.best_loss = float('inf')
         self.counter = 0
 
     def __call__(self, val_loss):
-        if val_loss < self.best_loss - self.delta:
+        if val_loss < self.best_loss:
             self.best_loss = val_loss
             self.counter = 0
             return False
@@ -222,11 +221,11 @@ class EarlyStopping:
 input_size = train_sequences[0].shape[1]
 hidden_size = 64
 output_size = train_targets[0].shape[0] 
-num_layers = 3
+num_layers = 2
 model = SimpleLSTM(input_size, hidden_size, output_size, num_layers).to(device)
 
 criterion = nn.MSELoss()
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 
 '''
@@ -277,7 +276,7 @@ tscv = TimeSeriesSplit(n_splits=5)
 for fold, (train_idx, val_idx) in enumerate(tscv.split(range(len(train_dataset)))):
     print(f"Fold {fold + 1}")
 
-    early_stopping = EarlyStopping(patience=5)
+    early_stopping = EarlyStopping(patience=10)
 
     #split data
     train_subset = torch.utils.data.Subset(train_dataset, train_idx)
