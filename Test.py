@@ -114,7 +114,6 @@ class TestDataset(Dataset):
 
 #Create the dataset and dataloader
 test_dataset = TestDataset(test_sequences, test_targets)
-print(len(test_dataset))
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 criterion = nn.MSELoss()
@@ -133,7 +132,6 @@ with torch.no_grad():
         loss = criterion(outputs, batch_targets)
         test_loss += loss.item()
 
-print(len(test_loader))
 test_loss /= len(test_loader)
 print(f"Test Loss (MSE): {test_loss:.4f}")
 

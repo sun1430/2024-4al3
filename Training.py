@@ -1,6 +1,3 @@
-import os
-import subprocess
-import sys
 import json
 import pandas as pd
 import numpy as np
@@ -227,50 +224,6 @@ model = SimpleLSTM(input_size, hidden_size, output_size, num_layers).to(device)
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-
-'''
-#Perform K-fold cross-validation
-kf = KFold(n_splits=5, shuffle=True, random_state=42)
-for fold, (train_idx, val_idx) in enumerate(kf.split(range(len(train_dataset)))):
-    print(f"Fold {fold + 1}")
-
-    #split data
-    train_subset = torch.utils.data.Subset(train_dataset, train_idx)
-    val_subset = torch.utils.data.Subset(train_dataset, val_idx)
-
-    train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_subset, batch_size=32, shuffle=False)
-
-    #train
-    model.train()
-    for epoch in range(20):
-        train_loss = 0
-        for batch_features, batch_targets in train_loader:
-            batch_features, batch_targets = batch_features.to(device), batch_targets.to(device)
-
-            optimizer.zero_grad()
-            outputs = model(batch_features)
-            loss = criterion(outputs, batch_targets)
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-        train_loss /= len(train_loader)
-        print(f"Epoch {epoch + 1}, Train Loss: {train_loss:.4f}")
-
-    #validate
-    model.eval()
-    val_loss = 0
-    with torch.no_grad():
-        for batch_features, batch_targets in val_loader:
-            batch_features, batch_targets = batch_features.to(device), batch_targets.to(device)
-
-            outputs = model(batch_features)
-            loss = criterion(outputs, batch_targets)
-            val_loss += loss.item()
-    val_loss /= len(val_loader)
-    print(f"Fold {fold + 1}, Validation Loss: {val_loss:.4f}")
-'''
-
 #Perform Time Series Split
 tscv = TimeSeriesSplit(n_splits=5)
 for fold, (train_idx, val_idx) in enumerate(tscv.split(range(len(train_dataset)))):
@@ -299,7 +252,6 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(range(len(train_dataset))
             optimizer.step()
             train_loss += loss.item()
         train_loss /= len(train_loader)
-        #print(f"Epoch {epoch + 1}, Train Loss: {train_loss:.4f}")
 
         #validate
         model.eval()
@@ -333,67 +285,3 @@ def save_model(model, optimizer, file_path, input_size, hidden_size, output_size
     print(f"Model Saved To {file_path}")
 
 save_model(model, optimizer, model_save_path, input_size, hidden_size, output_size, num_layers)
-
-'''
-def load_model_from_pickle(file_path, model_class, device):
-    checkpoint = torch.load(file_path, map_location=device, weights_only=False)
-    model = model_class(
-        input_size=checkpoint['input_size'],
-        hidden_size=checkpoint['hidden_size'],
-        output_size=checkpoint['output_size'],
-        num_layers=checkpoint['num_layers']
-    ).to(device)
-
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer = torch.optim.Adam(model.parameters())
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    return model, optimizer
-
-loaded_model, loaded_optimizer = load_model_from_pickle(model_save_path, SimpleRNN, device)
-print(f"Model Loaded From {model_save_path}")
-
-test_sequences, test_targets = create_sequences(data, "SOIL_LANDSCAPE_ID", feature_columns, target_columns, training_years, target_year)
-test_dataset = ErosionDataset(test_sequences, test_targets)
-test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
-loaded_model.eval()
-test_loss = 0
-predictions = []
-with torch.no_grad():
-    for batch_features, batch_targets in test_loader:
-        batch_features, batch_targets = batch_features.to(device), batch_targets.to(device)
-        outputs = loaded_model(batch_features)
-        predictions.append(outputs.cpu().numpy())
-        loss = criterion(outputs, batch_targets)
-        test_loss += loss.item()
-test_loss /= len(test_loader)
-print(f"Test Loss: {test_loss:.4f}")
-
-
-# De-normalize predictions
-scalers = {}
-for col in feature_columns:
-    scalers[col] = MinMaxScaler()
-    scalers[col].fit(data[data['Year'] <= 2016][[col]])
-
-def denormalize(predictions, scalers, columns):
-    de_normalized = []
-    for i, col in enumerate(columns):
-        de_normalized.append(scalers[col].inverse_transform(predictions[:, i].reshape(-1, 1)))
-    return np.hstack(de_normalized)
-
-predictions = np.array(predictions).squeeze()
-de_normalized_predictions = denormalize(predictions, scalers, feature_columns)
-
-test_targets = np.array(test_targets)
-mae = mean_absolute_error(test_targets, de_normalized_predictions)
-rmse = np.sqrt(mean_squared_error(test_targets, de_normalized_predictions))
-print(f"De-Normalized MAE: {mae:.4f}")
-print(f"De-Normalized RMSE: {rmse:.4f}")
-
-
-#Make a DataFrame for review
-predictions = np.array(predictions).squeeze()
-predicted_df = pd.DataFrame(predictions, columns=target_columns)
-predicted_df.to_csv("data/predicted_ERI_2021.csv", index=False)
-'''
