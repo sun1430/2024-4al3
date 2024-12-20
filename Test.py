@@ -10,6 +10,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 from sklearn.metrics import (mean_squared_error, mean_absolute_error, r2_score, accuracy_score,
                              confusion_matrix, ConfusionMatrixDisplay, precision_recall_fscore_support)
+import torch.nn.functional as F
 
 #Paths to files
 model_save_path = "rnn_model.pickle"
@@ -19,7 +20,7 @@ test_features_path = "data/test_features.npy"
 class SimpleRNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers):
         super(SimpleRNN, self).__init__()
-        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
+        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
@@ -27,6 +28,20 @@ class SimpleRNN(nn.Module):
         out = self.fc(out[:, -1, :])  # Use the last output of the RNN
         return out
 
+class SimpleLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, num_layers, dropout=0.2):
+        super(SimpleLSTM, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
+        self.fc = nn.Linear(hidden_size, output_size)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        out, (hn, cn) = self.lstm(x)
+        out = self.dropout(out[:, -1, :])
+        #out = self.fc(out)
+        out = F.leaky_relu(self.fc(out))
+        return out
+    
 def load_model_from_pickle(file_path, model_class, device):
     checkpoint = torch.load(file_path, map_location=device, weights_only=False)
     model = model_class(
@@ -50,7 +65,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 #Load the trained model
-loaded_model, loaded_optimizer = load_model_from_pickle(model_save_path, SimpleRNN, device)
+loaded_model, loaded_optimizer = load_model_from_pickle(model_save_path, SimpleLSTM, device)
 print(f"Model Loaded From {model_save_path}")
 loaded_model.eval()
 

@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from functools import reduce
+import torch.nn.functional as F
 
 # Load data
 file_path = "data/ENV_AEI_SOIL_ERI.csv"
@@ -122,7 +123,7 @@ print("Data preprocess complete -------")
 
 #-------------------------------------------------------
 
-# Load features.npy file
+#load features
 train_features = np.load("data/train_features.npy")
 test_features = np.load("data/test_features.npy")
 
@@ -176,23 +177,57 @@ train_dataset = ErosionDataset(train_sequences, train_targets)
 class SimpleRNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers):
         super(SimpleRNN, self).__init__()
-        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
+        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
+        self.fc = nn.Linear(hidden_size * 2, output_size)
 
     def forward(self, x):
         out, _ = self.rnn(x)
         out = self.fc(out[:, -1, :])
         return out
 
+class SimpleLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, num_layers, dropout=0.2):
+        super(SimpleLSTM, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
+        self.fc = nn.Linear(hidden_size, output_size)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        out, (hn, cn) = self.lstm(x)
+        out = self.dropout(out[:, -1, :])
+        #out = self.fc(out)
+        out = F.leaky_relu(self.fc(out))
+        return out
+
+class EarlyStopping:
+    def __init__(self, patience=5, delta=0):
+        self.patience = patience
+        self.delta = delta
+        self.best_loss = float('inf')
+        self.counter = 0
+
+    def __call__(self, val_loss):
+        if val_loss < self.best_loss - self.delta:
+            self.best_loss = val_loss
+            self.counter = 0
+            return False
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                print("Early stopping triggered.")
+                return True
+        return False
+    
 #Initializing
 input_size = train_sequences[0].shape[1]
 hidden_size = 64
 output_size = train_targets[0].shape[0] 
-num_layers = 2
-model = SimpleRNN(input_size, hidden_size, output_size, num_layers).to(device)
+num_layers = 3
+model = SimpleLSTM(input_size, hidden_size, output_size, num_layers).to(device)
 
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+
 
 '''
 #Perform K-fold cross-validation
@@ -242,6 +277,8 @@ tscv = TimeSeriesSplit(n_splits=5)
 for fold, (train_idx, val_idx) in enumerate(tscv.split(range(len(train_dataset)))):
     print(f"Fold {fold + 1}")
 
+    early_stopping = EarlyStopping(patience=5)
+
     #split data
     train_subset = torch.utils.data.Subset(train_dataset, train_idx)
     val_subset = torch.utils.data.Subset(train_dataset, val_idx)
@@ -250,8 +287,8 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(range(len(train_dataset))
     val_loader = DataLoader(val_subset, batch_size=32, shuffle=False)
 
     #train
-    model.train()
-    for epoch in range(20):
+    for epoch in range(40):
+        model.train()
         train_loss = 0
         for batch_features, batch_targets in train_loader:
             batch_features, batch_targets = batch_features.to(device), batch_targets.to(device)
@@ -263,20 +300,24 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(range(len(train_dataset))
             optimizer.step()
             train_loss += loss.item()
         train_loss /= len(train_loader)
-        print(f"Epoch {epoch + 1}, Train Loss: {train_loss:.4f}")
+        #print(f"Epoch {epoch + 1}, Train Loss: {train_loss:.4f}")
 
-    #validate
-    model.eval()
-    val_loss = 0
-    with torch.no_grad():
-        for batch_features, batch_targets in val_loader:
-            batch_features, batch_targets = batch_features.to(device), batch_targets.to(device)
+        #validate
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for batch_features, batch_targets in val_loader:
+                batch_features, batch_targets = batch_features.to(device), batch_targets.to(device)
 
-            outputs = model(batch_features)
-            loss = criterion(outputs, batch_targets)
-            val_loss += loss.item()
-    val_loss /= len(val_loader)
-    print(f"Fold {fold + 1}, Validation Loss: {val_loss:.4f}")
+                outputs = model(batch_features)
+                loss = criterion(outputs, batch_targets)
+                val_loss += loss.item()
+        val_loss /= len(val_loader)
+        print(f"Epoch {epoch + 1}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+
+        #arly stopping
+        if early_stopping(val_loss):
+            break
 
 #Function to save model as pickle
 model_save_path = "rnn_model.pickle"
@@ -292,8 +333,7 @@ def save_model(model, optimizer, file_path, input_size, hidden_size, output_size
     }, file_path)
     print(f"Model Saved To {file_path}")
 
-if not os.path.exists(model_save_path):
-    save_model(model, optimizer, model_save_path, input_size, hidden_size, output_size, num_layers)
+save_model(model, optimizer, model_save_path, input_size, hidden_size, output_size, num_layers)
 
 '''
 def load_model_from_pickle(file_path, model_class, device):
