@@ -58,9 +58,9 @@ final_data = reduce(lambda left, right: pd.merge(left, right, on=['SOIL_LANDSCAP
 def interpolate_missing_values(data, group_col, value_cols):
     data = data.copy()
     for col in value_cols:
-        # Replace zeros with NaN for meaningful interpolation
+        #replace zeros with NaN
         data[col] = data[col].replace(0, pd.NA)
-        # Group by ID and interpolate missing values
+        #group by ID and interpolate missing values
         data[col] = (
             data.groupby(group_col)[col]
             .apply(lambda x: x.interpolate(method='linear').bfill().ffill())
@@ -112,9 +112,6 @@ np.save("data/test_features.npy", test_features)
 
 #Output preprocessed data
 final_data = final_data.drop(columns = value_columns)
-
-#Save final processed data as CSV
-#final_data.to_csv("data/processed_data.csv", index=False)
 
 print("Data preprocess complete -------")
 
