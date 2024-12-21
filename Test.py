@@ -157,6 +157,8 @@ print(f"Loaded Predictions Shape: {predictions.shape}")
 # Filter test features for 2021 data
 target_year = 2021
 target_columns = [2, 3, 4, 5]
+#uncomment this to eliminate the eri of wind since it missing more than 80% of values
+#target_columns = [2, 3, 4]
 
 # Extract features for 2021
 test_2021 = test_features[test_features[:, 1] == target_year]

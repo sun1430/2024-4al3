@@ -103,15 +103,51 @@ with open('data/scaler_params.json', 'w') as f:
 train_data = final_data[final_data['Year'] <= 2016]
 test_data = final_data[final_data['Year'] >= 2006]
 
+#uncomment this to eliminate the eri of wind since it missing more than 80% of values
+#value_columnsN = ['Erosion_Value1N', 'Erosion_Value3N', 'Erosion_Value4N']
+
+
+train_features2 = train_data[['SOIL_LANDSCAPE_ID', 'Year'] + value_columns].values
+test_features2 = test_data[['SOIL_LANDSCAPE_ID', 'Year'] + value_columns].values
+
+train_df = pd.DataFrame(train_features2, columns=['SOIL_LANDSCAPE_ID', 'Year'] + value_columns)
+test_df = pd.DataFrame(test_features2, columns=['SOIL_LANDSCAPE_ID', 'Year'] + value_columns)
+
+def check_id_all_empty(data, id_column, value_column):
+    grouped = data.groupby(id_column)
+    ids_all_empty = grouped.filter(lambda group: group[value_column].isna().all() or (group[value_column] == 0).all())[id_column].unique()
+    return ids_all_empty
+
+ids_all_empty1 = check_id_all_empty(train_df, id_column='SOIL_LANDSCAPE_ID', value_column='Erosion_Value1')
+ids_all_empty2 = check_id_all_empty(train_df, id_column='SOIL_LANDSCAPE_ID', value_column='Erosion_Value2')
+ids_all_empty3 = check_id_all_empty(train_df, id_column='SOIL_LANDSCAPE_ID', value_column='Erosion_Value3')
+ids_all_empty4 = check_id_all_empty(train_df, id_column='SOIL_LANDSCAPE_ID', value_column='Erosion_Value4')
+print(f"IDs with all empty values across all years: {len(ids_all_empty1),len(ids_all_empty2),len(ids_all_empty3),len(ids_all_empty4)}")
+
+
 #Extract features and save as .npy
 train_features = train_data[['SOIL_LANDSCAPE_ID', 'Year'] + value_columnsN].values
 test_features = test_data[['SOIL_LANDSCAPE_ID', 'Year'] + value_columnsN].values
 
-np.save("data/train_features.npy", train_features)
-np.save("data/test_features.npy", test_features)
+train_features_filtered = train_features
+test_features_filtered = test_features
+
+#data preprocess attempt 2
+'''
+train_df2 = pd.DataFrame(train_features, columns=['SOIL_LANDSCAPE_ID', 'Year'] + value_columnsN)
+test_df2 = pd.DataFrame(test_features, columns=['SOIL_LANDSCAPE_ID', 'Year'] + value_columnsN)
+
+train_filtered = train_df[~train_df['SOIL_LANDSCAPE_ID'].isin(ids_all_empty2)]
+test_filtered = test_df[~test_df['SOIL_LANDSCAPE_ID'].isin(ids_all_empty2)]
+
+train_features_filtered = train_filtered.values
+test_features_filtered = test_filtered.values
+'''
+
+np.save("data/train_features.npy", train_features_filtered)
+np.save("data/test_features.npy", test_features_filtered)
 
 #Output preprocessed data
-final_data = final_data.drop(columns = value_columns)
 
 print("Data preprocess complete -------")
 
